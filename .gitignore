@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+env/
+data/processed/
+data/output/
+data/raw/
+README_long.md
+Reporting.md

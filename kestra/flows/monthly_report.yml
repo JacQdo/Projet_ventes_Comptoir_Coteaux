@@ -1,0 +1,194 @@
+id: monthly_sales_report
+
+namespace: ventes.comptoir.coteaux
+
+description: |
+  Pipeline mensuel de reporting des ventes du Comptoir Coteaux.
+
+  Kestra orchestre les différentes étapes du pipeline :
+  1. Extraction ERP
+  2. Extraction Web
+  3. Extraction de la table de liaison
+  4. Transformation et calcul des indicateurs
+  5. Génération des trois livrables commerciaux
+  6. Vérification des livrables
+
+tasks:
+
+  - id: pipeline
+    type: io.kestra.plugin.core.flow.Dag
+
+    tasks:
+
+      # ==========================================================
+      # 1. EXTRACTION ERP
+      # ==========================================================
+      - task:
+          id: extract_erp
+          type: io.kestra.plugin.scripts.python.Commands
+          pythonVersion: "3.12"
+
+          description: |
+            Extraction, nettoyage et contrôle des données ERP.
+
+          containerImage: ventes-coteaux:latest
+
+          fileHandlingStrategy: VOLUME
+          taskRunner:
+            type: io.kestra.plugin.scripts.runner.docker.Docker
+
+          commands:
+            - python /app/src/extract/extract_erp.py
+
+
+      # ==========================================================
+      # 2. EXTRACTION WEB
+      # ==========================================================
+      - task:
+          id: extract_web
+          type: io.kestra.plugin.scripts.python.Commands
+          pythonVersion: "3.12"
+
+          description: |
+            Extraction, nettoyage et contrôle des données Web.
+
+          containerImage: ventes-coteaux:latest
+
+          fileHandlingStrategy: VOLUME
+          taskRunner:
+            type: io.kestra.plugin.scripts.runner.docker.Docker
+            version: 2.0.3
+            
+
+          commands:
+            - python /app/src/extract/extract_web.py
+
+        dependsOn:
+          - extract_erp
+
+
+      # ==========================================================
+      # 3. EXTRACTION LIAISON ERP-WEB
+      # ==========================================================
+      - task:
+          id: extract_liaison
+          type: io.kestra.plugin.scripts.python.Commands
+          pythonVersion: "3.12"
+
+          description: |
+            Extraction, nettoyage et contrôle de la table
+            de liaison ERP-Web.
+
+          containerImage: ventes-coteaux:latest
+
+          fileHandlingStrategy: VOLUME
+          taskRunner:
+            type: io.kestra.plugin.scripts.runner.docker.Docker
+            volumes:
+              - "ventes-coteaux-data:/app"
+
+          commands:
+            - python /app/src/extract/extract_liaison.py
+
+        dependsOn:
+          - extract_erp
+
+
+      # ==========================================================
+      # 4. TRANSFORMATION
+      # ==========================================================
+      - task:
+          id: transform_sales
+          type: io.kestra.plugin.scripts.python.Commands
+          pythonVersion: "3.12"
+
+          description: |
+            Jointure ERP / Web / liaison.
+            Calcul du chiffre d'affaires.
+            Calcul du z-score.
+            Classification Premium / Ordinaire.
+
+          containerImage: ventes-coteaux:latest
+
+          fileHandlingStrategy: VOLUME
+          taskRunner:
+            type: io.kestra.plugin.scripts.runner.docker.Docker
+            volumes:
+              - "ventes-coteaux-data:/app"
+
+          commands:
+            - python /app/src/transform/transform_sales.py
+
+        dependsOn:
+          - extract_web
+          - extract_liaison
+
+
+      # ==========================================================
+      # 5. GENERATION DES RAPPORTS
+      # ==========================================================
+      - task:
+          id: generate_reports
+          type: io.kestra.plugin.scripts.python.Commands
+          pythonVersion: "3.12"
+
+          description: |
+            Génération des trois livrables commerciaux :
+            - rapport_ca.xlsx
+            - vins_premium.csv
+            - vins_ordinaires.csv
+
+          containerImage: ventes-coteaux:latest
+
+          fileHandlingStrategy: VOLUME
+          taskRunner:
+            type: io.kestra.plugin.scripts.runner.docker.Docker
+            volumes:
+              - "ventes-coteaux-data:/app"
+
+          commands:
+            - python /app/src/reporting/generate_reports.py
+
+        dependsOn:
+          - transform_sales
+
+
+      # ==========================================================
+      # 6. VERIFICATION DES LIVRABLES
+      # ==========================================================
+      - task:
+          id: verify_reports
+          type: io.kestra.plugin.scripts.shell.Commands
+
+          description: |
+            Vérification de la présence des trois livrables générés.
+
+          containerImage: alpine:latest
+
+          fileHandlingStrategy: VOLUME
+          taskRunner:
+            type: io.kestra.plugin.scripts.runner.docker.Docker
+            volumes:
+              - "ventes-coteaux-data:/app"
+
+          commands:
+            - test -f /app/data/output/rapport_ca.xlsx
+            - test -f /app/data/output/vins_premium.csv
+            - test -f /app/data/output/vins_ordinaires.csv
+            - echo "=== LIVRABLES PRESENTS ==="
+            - ls -lh /app/data/output/
+
+        dependsOn:
+          - generate_reports
+
+
+# ================================================================
+# PLANIFICATION MENSUELLE
+# ================================================================
+triggers:
+
+  - id: monthly
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 9 15 * *"
+    timezone: Europe/Paris
+
