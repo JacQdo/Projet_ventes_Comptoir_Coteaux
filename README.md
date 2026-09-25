@@ -834,3 +834,176 @@ sans intervention manuelle dans les différentes étapes du traitement.
 Projet Data Engineering — **Ventes Comptoir Coteaux**
 
 Objectif : construire un pipeline de données reproductible permettant l'extraction, la transformation, le contrôle qualité, l'analyse et le reporting automatisé des ventes.
+
+## 28. Logigramme du pipeline
+
+Le logigramme présente l’ensemble du pipeline de traitement des données de ventes de **Comptoir Coteaux**, depuis le déclenchement automatique dans Kestra jusqu’à la génération des livrables de reporting.
+
+Il permet de visualiser :
+
+* le déclenchement automatique du workflow **le 15 de chaque mois à 09h00** ;
+* l’extraction et le contrôle qualité des trois sources :
+
+  * fichier ERP ;
+  * fichier Web ;
+  * fichier de liaison ;
+* les étapes de jointure et de transformation des données ;
+* le calcul du chiffre d’affaires par produit ;
+* la classification des vins **Premium / Ordinaires** ;
+* la génération des trois livrables finaux :
+
+  * `rapport_ca.xlsx`
+  * `vins_premium.csv`
+  * `vins_ordinaires.csv`
+* les contrôles de vérification des fichiers produits.
+
+### Fichiers
+
+| Livrable                                                                                  | Description                                                   |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [`pipeline_ventes_comptoir_coteaux.drawio`](docs/pipeline_ventes_comptoir_coteaux.drawio) | Fichier source modifiable du logigramme, réalisé avec draw.io |
+| [`pipeline_ventes_comptoir_coteaux.png`](docs/pipeline_ventes_comptoir_coteaux.png)       | Export PNG du logigramme pour une consultation rapide         |
+
+### Résultats de référence
+
+Le pipeline permet d'obtenir, sur les données utilisées pour le projet :
+
+* **825** produits issus de l'ERP ;
+* **731** correspondances dans la table de liaison ;
+* **712** produits après rapprochement avec les données Web ;
+* **70 318,60 €** de chiffre d'affaires total ;
+* **30** vins classifiés Premium ;
+* **682** vins classifiés Ordinaires.
+
+Le fichier `.drawio` constitue la version source du diagramme et peut être modifié ultérieurement. Le fichier `.png` est destiné à faciliter sa consultation directement depuis le dépôt GitHub.
+
+### Structure GitHub cible
+
+Projet_ventes_Comptoir_Coteaux/
+│
+├── README.md
+│
+├── data/
+│   ├── raw/
+│   ├── processed/
+│   └── output/
+│       ├── rapport_ca.xlsx
+│       ├── vins_premium.csv
+│       └── vins_ordinaires.csv
+│
+├── docs/
+│   ├── pipeline.drawio
+│   ├── pipeline.png
+│   └── soutenance.pptx
+│
+├── kestra/
+│   └── flows/
+│       └── monthly_report.yml
+│
+├── src/
+│   ├── extract/
+│   │   ├── extract_erp.py
+│   │   ├── extract_web.py
+│   │   └── extract_liaison.py
+│   │
+│   ├── transform/
+│   │   └── transform_sales.py
+│   │
+│   └── reporting/
+│       └── generate_reports.py
+│
+├── tests/
+│
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── .gitignore
+└── README.md
+
+
+### 22. Architecture finale souhaitée
+
+                    KESTRA
+                       │
+                       ▼
+              extract_erp
+                       │
+              extract_web
+                       │
+           extract_liaison
+                       │
+                       ▼
+              transform_sales
+                       │
+                       ▼
+             generate_reports
+                       │
+          ┌────────────┼────────────┐
+          ▼            ▼            ▼
+     rapport_ca   premium.csv   ordinaires.csv
+
+                       ▲
+                       │
+              15 du mois - 09:00
+
+
+
+## Suivi de projet — OpenProject
+
+Le suivi et l'organisation du projet ont été réalisés avec **OpenProject** afin de structurer les différentes étapes de réalisation, suivre l'avancement des tâches et visualiser le workflow de développement.
+
+### Backlog
+
+Le **backlog** regroupe l'ensemble des tâches nécessaires à la réalisation du projet.
+
+Les principales phases suivies sont notamment :
+
+* Analyse du besoin et définition des objectifs ;
+* Préparation et contrôle des fichiers sources ;
+* Développement des scripts d'extraction ;
+* Nettoyage et contrôle qualité des données ;
+* Transformation et jointure des données ;
+* Calcul des indicateurs commerciaux ;
+* Génération des livrables de reporting ;
+* Mise en place de Docker ;
+* Orchestration avec Kestra ;
+* Tests et contrôles finaux ;
+* Préparation de la documentation ;
+* Préparation de la soutenance ;
+* Finalisation et dépôt sur GitHub.
+
+Le backlog permet également de décomposer chaque phase en sous-tâches afin de faciliter le suivi de la réalisation.
+
+### Kanban
+
+Le tableau **Kanban OpenProject** permet de suivre visuellement l'état d'avancement des tâches.
+
+Les tâches sont déplacées entre différents statuts, par exemple :
+
+**Backlog → À faire → En cours → En test → Terminé**
+
+Cette organisation permet de :
+
+* visualiser rapidement l'état du projet ;
+* identifier les tâches restant à réaliser ;
+* suivre les tâches en cours de développement ;
+* distinguer les tâches en phase de test ;
+* valider progressivement les livrables terminés.
+
+### Suivi de l'avancement
+
+OpenProject constitue ainsi l'outil de pilotage du projet, tandis que **GitHub** centralise le code source, la documentation et les livrables finaux.
+
+Le workflow global est donc :
+
+**OpenProject → Planification et suivi**
+
+**Git / GitHub → Versionnement et dépôt**
+
+**Docker → Environnement d'exécution**
+
+**Kestra → Orchestration et automatisation**
+
+**Python / Pandas → Traitement des données**
+
+**Excel / CSV → Livrables de reporting**

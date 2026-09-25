@@ -52,7 +52,8 @@ services:
         kestra:
           server:
             basic-auth:
-              enabled: false
+              username: "jacquessdossou@yahoo.com"
+              password: "DOSjrm4@"
 
           repository:
             type: postgres
@@ -73,7 +74,7 @@ services:
             configurations:
               - type: io.kestra.plugin.scripts.runner.docker.Docker
                 values:
-                  volume-enabled: true
+                  volume-enabled: false
 
 
 volumes:

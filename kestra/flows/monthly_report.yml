@@ -1,3 +1,4 @@
+﻿
 id: monthly_sales_report
 
 namespace: ventes.comptoir.coteaux
@@ -5,13 +6,14 @@ namespace: ventes.comptoir.coteaux
 description: |
   Pipeline mensuel de reporting des ventes du Comptoir Coteaux.
 
-  Kestra orchestre les différentes étapes du pipeline :
+  Kestra orchestre les diffÃ©rentes Ã©tapes du pipeline :
   1. Extraction ERP
   2. Extraction Web
   3. Extraction de la table de liaison
   4. Transformation et calcul des indicateurs
-  5. Génération des trois livrables commerciaux
-  6. Vérification des livrables
+  5. Traitement analytique DuckDB / SQL
+  6. GÃ©nÃ©ration des trois livrables commerciaux
+  7. VÃ©rification des livrables
 
 tasks:
 
@@ -29,7 +31,7 @@ tasks:
           pythonVersion: "3.12"
 
           description: |
-            Extraction, nettoyage et contrôle des données ERP.
+            Extraction, nettoyage et contrÃ´le des donnÃ©es ERP.
 
           containerImage: ventes-coteaux:latest
 
@@ -50,7 +52,7 @@ tasks:
           pythonVersion: "3.12"
 
           description: |
-            Extraction, nettoyage et contrôle des données Web.
+            Extraction, nettoyage et contrÃ´le des donnÃ©es Web.
 
           containerImage: ventes-coteaux:latest
 
@@ -58,7 +60,6 @@ tasks:
           taskRunner:
             type: io.kestra.plugin.scripts.runner.docker.Docker
             version: 2.0.3
-            
 
           commands:
             - python /app/src/extract/extract_web.py
@@ -76,7 +77,7 @@ tasks:
           pythonVersion: "3.12"
 
           description: |
-            Extraction, nettoyage et contrôle de la table
+            Extraction, nettoyage et contrÃ´le de la table
             de liaison ERP-Web.
 
           containerImage: ventes-coteaux:latest
@@ -125,6 +126,36 @@ tasks:
 
 
       # ==========================================================
+      # 4 BIS. TRAITEMENT ANALYTIQUE DUCKDB / SQL
+      # ==========================================================
+      - task:
+          id: run_duckdb_sql
+          type: io.kestra.plugin.scripts.python.Commands
+          pythonVersion: "3.12"
+
+          description: |
+            ExÃ©cution des quatre scripts SQL DuckDB :
+            - staging
+            - sales mart
+            - KPI commerciaux
+            - vins Premium
+
+          containerImage: ventes-coteaux:latest
+
+          fileHandlingStrategy: VOLUME
+          taskRunner:
+            type: io.kestra.plugin.scripts.runner.docker.Docker
+            volumes:
+              - "ventes-coteaux-data:/app"
+
+          commands:
+            - python -c "import duckdb; con=duckdb.connect('/app/data/processed/sales.duckdb'); con.execute(open('/app/sql/staging/01_staging.sql').read()); con.execute(open('/app/sql/marts/02_sales_mart.sql').read()); con.execute(open('/app/sql/analytics/03_kpi_sales.sql').read()); con.execute(open('/app/sql/analytics/04_premium_wines.sql').read()); print('=== DUCKDB SQL TERMINE ==='); print(con.execute('SELECT * FROM kpi_sales').fetchdf().to_string(index=False)); print('Premium:', con.execute('SELECT COUNT(*) FROM premium_wines').fetchone()[0]); con.close()"
+
+        dependsOn:
+          - transform_sales
+
+
+      # ==========================================================
       # 5. GENERATION DES RAPPORTS
       # ==========================================================
       - task:
@@ -133,7 +164,7 @@ tasks:
           pythonVersion: "3.12"
 
           description: |
-            Génération des trois livrables commerciaux :
+            GÃ©nÃ©ration des trois livrables commerciaux :
             - rapport_ca.xlsx
             - vins_premium.csv
             - vins_ordinaires.csv
@@ -150,7 +181,7 @@ tasks:
             - python /app/src/reporting/generate_reports.py
 
         dependsOn:
-          - transform_sales
+          - run_duckdb_sql
 
 
       # ==========================================================
@@ -161,7 +192,7 @@ tasks:
           type: io.kestra.plugin.scripts.shell.Commands
 
           description: |
-            Vérification de la présence des trois livrables générés.
+            VÃ©rification de la prÃ©sence des trois livrables gÃ©nÃ©rÃ©s.
 
           containerImage: alpine:latest
 
@@ -191,4 +222,3 @@ triggers:
     type: io.kestra.plugin.core.trigger.Schedule
     cron: "0 9 15 * *"
     timezone: Europe/Paris
-
